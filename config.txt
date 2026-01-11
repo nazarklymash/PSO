@@ -1,0 +1,15 @@
+# Plik konfiguracyjny parametrów PSO
+# Format: nazwa_parametru=wartość
+
+# Waga bezwładności (jak bardzo cząstka utrzymuje swój kierunek)
+# Typowe wartości: 0.4 - 0.9
+w = 0.5
+
+# Współczynnik poznawczy (pamięć własna - jak bardzo cząstka ufa swojemu doświadczeniu)
+# Typowe wartości: 1.0 - 2.0
+c1 = 1.0
+
+# Współczynnik społeczny (wiedza roju - jak bardzo cząstka ufa grupie)
+# Typowe wartości: 1.0 - 2.0
+c2 = 1.0
+
