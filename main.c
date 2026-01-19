@@ -17,7 +17,7 @@ void print_usage() {
     printf("-n <liczba>    Co którą iterację zapisywać postępy (0 = brak zapisu, domyślnie: 0)\n");
     printf("-o <plik>      Nazwa pliku wyjściowego CSV (domyślnie: output.csv)\n");
     printf("-h             Wyświetl ta pomoc\n\n");
-    printf("./pso terrain.txt -p 50 -i 200 -c config.txt -n 2\n");
+    printf("./pso terrain.txt -p 50 -i 200 -c config.txt -n 2 -o output.csv\n");
 }
 
 int main(int argc, char** argv) {

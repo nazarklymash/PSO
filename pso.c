@@ -130,7 +130,7 @@ void pso_run(Swarm *swarm, Map *map, PSOParams *params, int iterations, int log_
     for (int i = 0; i < iterations; i++) {
         pso_iterate(swarm, map, params);
 
-        // Logowanie kazdą iterację
+        // Logowanie kazdą iterację do csv
         if (logger && log_interval > 0 && (i % log_interval == 0 || i == iterations - 1)) {
             logger_write_iteration(logger, i, swarm);
         }
