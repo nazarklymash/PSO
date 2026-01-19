@@ -12,16 +12,15 @@ typedef struct {
 } Logger;
 
 // Tworzy logger i otwiera plik do zapisu
-Logger* logger_create(const char *filename);
+Logger* logger_create(char *filename);
 
-// Zamyka plik i zwalnia pamięć loggera
+// Zamyka plik i zwalnia pamięć
 void logger_close(Logger *logger);
 
-// Zapisuje nagłówek CSV
+// Zapisuje header csv do ktorego zapisujemy
 void logger_write_header(Logger *logger, int num_particles);
 
 // Zapisuje dane o pozycjach cząstek dla danej iteracji
-void logger_write_iteration(Logger *logger, int iteration, const Swarm *swarm);
+void logger_write_iteration(Logger *logger, int iteration, Swarm *swarm);
 
-#endif // LOGGER_H
-
+#endif

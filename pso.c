@@ -5,58 +5,50 @@
 #include <float.h>
 #include "pso.h"
 #include "logger.h"
+#include "utils.h"
 
-// Generuje losową liczbę z zakresu [0, 1]
-static double random_01(void) {
-    return (double)rand() / RAND_MAX;
-}
-
-// Generuje losową liczbę z zakresu [min, max]
-static double random_range(double min, double max) {
-    return min + random_01() * (max - min);
-}
-
-Swarm* swarm_create(int num_particles, const Map *map) {
+Swarm* swarm_create(int num_particles, Map *map) {
     Swarm *swarm = (Swarm*)malloc(sizeof(Swarm));
     if (!swarm) {
-        fprintf(stderr, "Błąd: Nie można zaalokować pamięci dla roju\n");
+        fprintf(stderr, "Blad alokacji pamięci dla roju\n");
         return NULL;
     }
 
     swarm->num_particles = num_particles;
     swarm->particles = (Particle*)malloc(num_particles * sizeof(Particle));
+
     if (!swarm->particles) {
-        fprintf(stderr, "Błąd: Nie można zaalokować pamięci dla cząstek\n");
+        fprintf(stderr, "Blad alokacji pamięci dla cząstek\n");
         free(swarm);
         return NULL;
     }
 
-    swarm->gBest_x = 0;
-    swarm->gBest_y = 0;
-    swarm->gBest_value = -DBL_MAX;
+    swarm->global_best_x = 0;
+    swarm->global_best_y = 0;
+    swarm->global_best_value = -DBL_MAX;
 
     // Inicjalizacja cząstek w losowych pozycjach na mapie
     for (int i = 0; i < num_particles; i++) {
         Particle *p = &swarm->particles[i];
 
         // Losowa pozycja na mapie
-        p->x = random_range(0, map->width);
-        p->y = random_range(0, map->height);
+        p->x = utils_random_range(0, map->width);
+        p->y = utils_random_range(0, map->height);
 
-        // Losowa początkowa prędkość (niewielka)
-        p->vx = random_range(-1, 1);
-        p->vy = random_range(-1, 1);
+        // Losowa początkowa prędkość
+        p->vx = utils_random_range(-1, 1);
+        p->vy = utils_random_range(-1, 1);
 
-        // pBest to początkowa pozycja
-        p->pBest_x = p->x;
-        p->pBest_y = p->y;
-        p->pBest_value = map_get_value(map, p->x, p->y);
+        // best_x / best_y to początkowa pozycja
+        p->best_x = p->x;
+        p->best_y = p->y;
+        p->best_v = map_get_value(map, p->x, p->y);
 
         // Aktualizacja gBest jeśli to najlepsza pozycja
-        if (p->pBest_value > swarm->gBest_value) {
-            swarm->gBest_value = p->pBest_value;
-            swarm->gBest_x = p->pBest_x;
-            swarm->gBest_y = p->pBest_y;
+        if (p->best_v > swarm->global_best_value) {
+            swarm->global_best_value = p->best_v;
+            swarm->global_best_x = p->best_x;
+            swarm->global_best_y = p->best_y;
         }
     }
 
@@ -72,30 +64,30 @@ void swarm_free(Swarm *swarm) {
     }
 }
 
-void pso_iterate(Swarm *swarm, const Map *map, const PSOParams *params) {
+void pso_iterate(Swarm *swarm, Map *map, PSOParams *params) {
     for (int i = 0; i < swarm->num_particles; i++) {
         Particle *p = &swarm->particles[i];
 
         // Losowe współczynniki r1 i r2
-        double r1 = random_01();
-        double r2 = random_01();
+        double r1 = utils_random_01();
+        double r2 = utils_random_01();
 
-        // Aktualizacja prędkości według wzoru PSO
+        // Aktualizacja prędkości godnie ze wzorem PSO
         // v(t+1) = w * v(t) + c1 * r1 * (pBest - x) + c2 * r2 * (gBest - x)
-        p->vx = params->w * p->vx
-              + params->c1 * r1 * (p->pBest_x - p->x)
-              + params->c2 * r2 * (swarm->gBest_x - p->x);
+        p->vx = params->w * p->vx + params->c1 * r1 * (p->best_x - p->x) + params->c2 * r2 * (swarm->global_best_x - p->x);
 
-        p->vy = params->w * p->vy
-              + params->c1 * r1 * (p->pBest_y - p->y)
-              + params->c2 * r2 * (swarm->gBest_y - p->y);
+        p->vy = params->w * p->vy + params->c1 * r1 * (p->best_y - p->y) + params->c2 * r2 * (swarm->global_best_y - p->y);
 
-        // Ograniczenie prędkości (opcjonalne, ale pomocne)
+        // Ograniczenie prędkości
         double max_velocity = 2.0;
-        if (p->vx > max_velocity) p->vx = max_velocity;
-        if (p->vx < -max_velocity) p->vx = -max_velocity;
-        if (p->vy > max_velocity) p->vy = max_velocity;
-        if (p->vy < -max_velocity) p->vy = -max_velocity;
+        if (p->vx > max_velocity) 
+            p->vx = max_velocity;
+        if (p->vx < -max_velocity) 
+            p->vx = -max_velocity;
+        if (p->vy > max_velocity) 
+            p->vy = max_velocity;
+        if (p->vy < -max_velocity) 
+            p->vy = -max_velocity;
 
         // Aktualizacja pozycji
         // x(t+1) = x(t) + v(t+1)
@@ -105,26 +97,25 @@ void pso_iterate(Swarm *swarm, const Map *map, const PSOParams *params) {
         // Obliczenie wartości funkcji celu
         double fitness = map_get_value(map, p->x, p->y);
 
-        // Aktualizacja pBest
-        if (fitness > p->pBest_value) {
-            p->pBest_value = fitness;
-            p->pBest_x = p->x;
-            p->pBest_y = p->y;
+        // Aktualizacja best_x best_y i best_v
+        if (fitness > p->best_v) {
+            p->best_v = fitness;
+            p->best_x = p->x;
+            p->best_y = p->y;
         }
 
-        // Aktualizacja gBest
-        if (fitness > swarm->gBest_value) {
-            swarm->gBest_value = fitness;
-            swarm->gBest_x = p->x;
-            swarm->gBest_y = p->y;
+        // Aktualizacja global_best -ow
+        if (fitness > swarm->global_best_value) {
+            swarm->global_best_value = fitness;
+            swarm->global_best_x = p->x;
+            swarm->global_best_y = p->y;
         }
     }
 }
 
-void pso_run(Swarm *swarm, const Map *map, const PSOParams *params,
-             int iterations, int log_interval, const char *log_filename) {
+void pso_run(Swarm *swarm, Map *map, PSOParams *params, int iterations, int log_interval, char *log_filename) {
 
-    // Jeśli logowanie jest włączone, otwórz plik
+    // Jezeli logger istnieje to inicjalizujemy go
     Logger *logger = NULL;
     if (log_interval > 0 && log_filename) {
         logger = logger_create(log_filename);
@@ -133,52 +124,52 @@ void pso_run(Swarm *swarm, const Map *map, const PSOParams *params,
         }
     }
 
-    printf("Rozpoczynam symulację PSO...\n");
-    printf("Parametry: w=%.2f, c1=%.2f, c2=%.2f\n", params->w, params->c1, params->c2);
-    printf("Liczba cząstek: %d, Liczba iteracji: %d\n\n", swarm->num_particles, iterations);
+    printf("Parametry algorytmu: w=%lf, c1=%lf, c2=%lf\n", params->w, params->c1, params->c2);
+    printf("Liczba cząstek: %d, Liczba iteracji: %d\n", swarm->num_particles, iterations);
 
-    for (int iter = 0; iter < iterations; iter++) {
+    for (int i = 0; i < iterations; i++) {
         pso_iterate(swarm, map, params);
 
-        // Logowanie co n-tą iterację
-        if (logger && log_interval > 0 && (iter % log_interval == 0 || iter == iterations - 1)) {
-            logger_write_iteration(logger, iter, swarm);
+        // Logowanie kazdą iterację
+        if (logger && log_interval > 0 && (i % log_interval == 0 || i == iterations - 1)) {
+            logger_write_iteration(logger, i, swarm);
         }
 
-        // Wypisz postęp co 10% iteracji
-        if ((iter + 1) % (iterations / 10 + 1) == 0 || iter == iterations - 1) {
-            printf("Iteracja %d/%d: gBest = (%.2f, %.2f), wartość = %.2f\n",
-                   iter + 1, iterations, swarm->gBest_x, swarm->gBest_y, swarm->gBest_value);
+        // Wypisz postęp co 0.1 od ilosci iteracji
+        if ((i + 1) % (iterations / 10 + 1) == 0 || i == iterations - 1) {
+            printf("Iteracja %d/%d: gBest = (%lf, %lf), wartość = %lf\n", i + 1, iterations, swarm->global_best_x, swarm->global_best_y, swarm->global_best_value);
         }
     }
 
     if (logger) {
         logger_close(logger);
-        printf("\nDane zapisano do pliku: %s\n", log_filename);
+        printf("\nDane zapisano do pliku %s\n", log_filename);
     }
 
-    printf("\n=== WYNIK SYMULACJI ===\n");
-    printf("Znaleziono źródło sygnału na pozycji: (%.2f, %.2f)\n",
-           swarm->gBest_x, swarm->gBest_y);
-    printf("Siła sygnału: %.2f\n", swarm->gBest_value);
+    printf("\n\n");
+
+    printf("Znaleziono źródło sygnału na pozycji: (%lf, %lf)\n", swarm->global_best_x, swarm->global_best_y);
+    printf("Siła sygnału: %lf\n", swarm->global_best_value);
 }
 
-int pso_load_config(const char *filename, PSOParams *params) {
+int pso_load_config( char *filename, PSOParams *params) {
     FILE *file = fopen(filename, "r");
     if (!file) {
-        fprintf(stderr, "Błąd: Nie można otworzyć pliku konfiguracyjnego: %s\n", filename);
+        fprintf(stderr, "Nie można otworzyć pliku konfiguracyjnego");
         return 0;
     }
 
     char line[256];
     while (fgets(line, sizeof(line), file)) {
-        // Ignoruj komentarze i puste linie
+        // Ignorujemy komentarze i puste linie
         if (line[0] == '#' || line[0] == '\n') {
             continue;
         }
 
         char key[64];
         double value;
+
+        // Pobieramy maks 63 znaki dopoki nie napotkamy = i przypisujemy do key, a reszte do value
         if (sscanf(line, "%63[^=]=%lf", key, &value) == 2) {
             // Usuń białe znaki z klucza
             char *k = key;
@@ -202,4 +193,3 @@ int pso_load_config(const char *filename, PSOParams *params) {
     fclose(file);
     return 1;
 }
-
